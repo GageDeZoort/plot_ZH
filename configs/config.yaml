@@ -1,0 +1,12 @@
+verbose: 1
+year: 2017
+LT_cut: 0.0
+sign: 'OS'
+analysis: 'AZH'
+MC_only: true
+loose_cuts: false
+unblind: false
+tau_ID_SF: true
+redo_fit: false
+shift_ES: 'None'
+mass_reco: 'FastMTT'
