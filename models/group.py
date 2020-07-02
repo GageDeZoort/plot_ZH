@@ -31,6 +31,10 @@ class Group(object):
                               for cat in categories.values()}
         self.cutflow_hists = {cat:bh.Histogram(bh.axis.Regular(20,  0.0, 20.0))
                               for cat in categories.values()}
+
+    def get_hists(self, cat):
+        return [self.mtt_hists[cat], self.LT_hists[cat], self.pt1_hists[cat],
+                self.ESratio_hists[cat], self.cutflow_hists[cat]]
         
     def add_sample(self, sample):
         sample.get_events()

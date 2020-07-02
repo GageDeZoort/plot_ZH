@@ -25,7 +25,6 @@ class Data(Group):
         return w1, w2, w1*w2
 
     def apply_fake_weights(self, sample, tight1, tight2, WP=16):
-        FF = fakeFactor2.fakeFactor2(self.year, WP)
         fe, fm, ft_et, ft_mt, f1_tt, f2_tt   = 0.0390, 0.0794, 0.1397, 0.1177, 0.0756, 0.0613
         fW1, fW2, fW0 = {}, {}, {}
         fW1['et'], fW2['et'], fW0['et'] = self.get_fake_weights(fe, ft_et)

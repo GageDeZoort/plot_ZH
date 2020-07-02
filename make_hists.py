@@ -3,18 +3,18 @@ import uproot
 import numpy as np
 import yaml
 from tqdm import tqdm
+import pickle
 import ROOT
 import boost_histogram as bh
 
-from fitter import Fitter
-from sample import Sample
-from group import Group
-from data import Data
-from reducible import Reducible
+from models.fitter import Fitter
+from models.sample import Sample
+from models.group import Group
+from models.data import Data
+from models.reducible import Reducible
 from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
 from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
 import ScaleFactor as SF
-import fakeFactor2
         
 # >> python MHBG.py configs/config_MHBG.yaml
 parser = argparse.ArgumentParser('MHBG.py')
@@ -129,7 +129,7 @@ signal.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven
 
 print("Analyzing ZZ events")
 ZZ.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-                tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+                   tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 # build a data analyzer
 data_path = "../data/condor/{0:s}/{1:s}/{1:s}_data.root".format(analysis, era)
@@ -139,5 +139,14 @@ data.add_sample(data_sample)
 data.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
                      tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
-
-    
+# write output to pickle file
+for cat in categories.values():
+    outfile = open("histograms/{0}_hists.pkl".format(cat), "w+")
+    hists = {}
+    hists['data'] = data.get_hists(cat)
+    hists['reducible'] = reducible.get_hists(cat)
+    hists['signal'] = signal.get_hists(cat)
+    hists['rare'] = rare.get_hists(cat)
+    hists['ZZ'] = ZZ.get_hists(cat)
+    pickle.dump(hists, outfile)
+    outfile.close()
