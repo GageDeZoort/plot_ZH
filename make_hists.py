@@ -6,6 +6,8 @@ from tqdm import tqdm
 import pickle
 import ROOT
 import boost_histogram as bh
+import mplhep as hep
+from matplotlib import pyplot as plt
 
 from models.fitter import Fitter
 from models.sample import Sample
@@ -38,13 +40,14 @@ LT_cut = config['LT_cut']
 redo_fit = config['redo_fit']
 mass_reco = config['mass_reco']
 unblind = config['unblind']
+data_dir = config['data_dir']
 
 if shift_ES not in ['None', 'Down', 'Up']:
     raise ValueError("{0} is not a valid tau_ES (please use 'None', 'Down', or 'Up')"
                      .format(tau_ES))
 
-categories = cats = {1:'eeet', 2:'eemt', 3:'eett', 4:'eeem', 
-                     5:'mmet', 6:'mmmt', 7:'mmtt', 8:'mmem'}
+categories = {1:'eeet', 2:'eemt', 3:'eett', 4:'eeem', 
+              5:'mmet', 6:'mmmt', 7:'mmtt', 8:'mmem'}
 lumi = {'2016' : 35.92*10**3, '2017' : 41.53*10**3, '2018' : 59.74*10**3}
 
 # configure the tau energy scale by year
@@ -113,40 +116,58 @@ reducible.reweight_nJets(lumi[era])
 signal.reweight_samples(10.0)
 
 print("Analyzing reducible events")    
-reducible.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven, 
-                          tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
-
-for hist in reducible.cutflow_hists.values():
-    print(hist)
+#reducible.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven, 
+#                          tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 print("Analyzing rare events")
-rare.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-                     tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+#rare.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
+#                     tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 print("Analyzing signal events")
-signal.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-                       tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+#signal.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
+#                       tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 print("Analyzing ZZ events")
-ZZ.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-                   tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+#ZZ.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
+#                   tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 # build a data analyzer
-data_path = "../data/condor/{0:s}/{1:s}/{1:s}_data.root".format(analysis, era)
+data_path = data_dir+"/condor/{0:s}/{1:s}/{1:s}_data.root".format(analysis, era)
 data = Data(categories, tau_SF, antiEle_SF, antiMu_SF, era_int)
 data_sample = Sample('data', data_path, 1.0, 1.0, 1.0)
 data.add_sample(data_sample)
 data.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
                      tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
+def pickle_hists(cat, hists):
+    for name, hist in hists.items():
+        print("histograms/{0}_{1}.pkl".format(cat, name), hist)
+        with open("histograms/{0}_{1}.pkl".format(cat, name), 'wb') as f:
+            pickle.dump(hist, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+plt.style.use([hep.style.ROOT, hep.style.firamath])
+def plot_hists(cat, hists):
+    f, axs = plt.subplots(2,2,sharex=True,sharey=True)
+    axs = axs.flatten()
+    for i, hist in enumerate(hists.values()):
+        print(i, hist)
+        bins, edges = bh.numpy.histogram(hist, bins='auto', histogram=bh.Histogram)
+        #hep.histplot(bins, edges, ax=axs[i])
+    
+    plt.tight_layout()
+    plt.show()
+    plt.savefig("test.png", dpi=1200)
+
 # write output to pickle file
 for cat in categories.values():
     outfile = open("histograms/{0}_hists.pkl".format(cat), "w+")
-    hists = {}
-    hists['data'] = data.get_hists(cat)
-    hists['reducible'] = reducible.get_hists(cat)
-    hists['signal'] = signal.get_hists(cat)
-    hists['rare'] = rare.get_hists(cat)
-    hists['ZZ'] = ZZ.get_hists(cat)
-    pickle.dump(hists, outfile)
-    outfile.close()
+    pickle_hists(cat, data.get_hists(cat))
+    #plot_hists(cat, data.get_hists(cat))
+    #pickle_hists(cat, reducible.get_hists(cat))
+    #pickle_hists(cat, signal.get_hists(cat))
+    #pickle_hists(cat, rare.get_hists(cat))
+    #pickle_hists(cat, ZZ.get_hists(cat))
+    
+
+

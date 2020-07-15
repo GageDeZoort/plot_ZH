@@ -5,8 +5,8 @@ from tqdm import tqdm
 import ROOT
 import boost_histogram as bh
 
-from fitter import Fitter
-from sample import Sample
+from .fitter import Fitter
+from .sample import Sample
 from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
 from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
 import ScaleFactor as SF
@@ -33,8 +33,8 @@ class Group(object):
                               for cat in categories.values()}
 
     def get_hists(self, cat):
-        return [self.mtt_hists[cat], self.LT_hists[cat], self.pt1_hists[cat],
-                self.ESratio_hists[cat], self.cutflow_hists[cat]]
+        return {'mtt':self.mtt_hists[cat], 'LT':self.LT_hists[cat], 'pt1':self.pt1_hists[cat],
+                'ESratio':self.ESratio_hists[cat], 'cutflow':self.cutflow_hists[cat]}
         
     def add_sample(self, sample):
         sample.get_events()

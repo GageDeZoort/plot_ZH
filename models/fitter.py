@@ -1,8 +1,7 @@
 import os
 import numpy as np
 import ROOT
-
-from sample import Sample
+from .sample import Sample
 
 class Fitter:
     def __init__(self, mode, ES_tool=None, shift='None', constrain=False):

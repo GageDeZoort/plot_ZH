@@ -5,9 +5,9 @@ from tqdm import tqdm
 import ROOT
 import boost_histogram as bh
 
-from fitter import Fitter
-from sample import Sample
-from group  import Group
+from .fitter import Fitter
+from .sample import Sample
+from .group  import Group
 from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
 from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
 import ScaleFactor as SF
