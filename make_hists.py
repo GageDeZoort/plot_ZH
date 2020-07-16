@@ -1,3 +1,4 @@
+import sys
 import argparse
 import uproot
 import numpy as np
@@ -14,8 +15,9 @@ from models.sample import Sample
 from models.group import Group
 from models.data import Data
 from models.reducible import Reducible
-from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
-from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
+sys.path.append("../../TauPOG/TauIDSFs/python/")
+from TauIDSFTool import TauIDSFTool
+from TauIDSFTool import TauESTool
 import ScaleFactor as SF
         
 # >> python MHBG.py configs/config_MHBG.yaml
@@ -116,20 +118,20 @@ reducible.reweight_nJets(lumi[era])
 signal.reweight_samples(10.0)
 
 print("Analyzing reducible events")    
-#reducible.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven, 
-#                          tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+reducible.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven, 
+                          tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 print("Analyzing rare events")
-#rare.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-#                     tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+rare.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
+                     tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 print("Analyzing signal events")
-#signal.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-#                       tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+signal.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
+                       tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 print("Analyzing ZZ events")
-#ZZ.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
-#                   tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
+ZZ.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
+                   tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
 # build a data analyzer
 data_path = data_dir+"/condor/{0:s}/{1:s}/{1:s}_data.root".format(analysis, era)
@@ -139,35 +141,20 @@ data.add_sample(data_sample)
 data.process_samples(tight_cuts=tight_cuts, sign=sign, data_driven=data_driven,
                      tau_ID_SF=tau_ID_SF, redo_fit=redo_fit, LT_cut=LT_cut)
 
-def pickle_hists(cat, hists):
+def pickle_hists(cat, hists, tag):
     for name, hist in hists.items():
-        print("histograms/{0}_{1}.pkl".format(cat, name), hist)
-        with open("histograms/{0}_{1}.pkl".format(cat, name), 'wb') as f:
+        print("histograms/{0}_{1}_{2}.pkl".format(tag, cat, name), hist)
+        with open("histograms/{0}_{1}_{2}.pkl".format(tag, cat, name), 'wb') as f:
             pickle.dump(hist, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-plt.style.use([hep.style.ROOT, hep.style.firamath])
-def plot_hists(cat, hists):
-    f, axs = plt.subplots(2,2,sharex=True,sharey=True)
-    axs = axs.flatten()
-    for i, hist in enumerate(hists.values()):
-        print(i, hist)
-        bins, edges = bh.numpy.histogram(hist, bins='auto', histogram=bh.Histogram)
-        #hep.histplot(bins, edges, ax=axs[i])
-    
-    plt.tight_layout()
-    plt.show()
-    plt.savefig("test.png", dpi=1200)
 
 # write output to pickle file
 for cat in categories.values():
     outfile = open("histograms/{0}_hists.pkl".format(cat), "w+")
-    pickle_hists(cat, data.get_hists(cat))
-    #plot_hists(cat, data.get_hists(cat))
-    #pickle_hists(cat, reducible.get_hists(cat))
-    #pickle_hists(cat, signal.get_hists(cat))
-    #pickle_hists(cat, rare.get_hists(cat))
-    #pickle_hists(cat, ZZ.get_hists(cat))
+    pickle_hists(cat, data.get_hists(cat), "data")
+    pickle_hists(cat, reducible.get_hists(cat), "reducible")
+    pickle_hists(cat, signal.get_hists(cat), "signal")
+    pickle_hists(cat, rare.get_hists(cat), "rare")
+    pickle_hists(cat, ZZ.get_hists(cat), "ZZ")
     
 
 

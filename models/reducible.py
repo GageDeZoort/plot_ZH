@@ -1,3 +1,4 @@
+import sys
 import uproot
 import numpy as np
 from tqdm import tqdm
@@ -7,8 +8,9 @@ import boost_histogram as bh
 from .fitter import Fitter
 from .sample import Sample
 from .group  import Group
-from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
-from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
+sys.path.append("../../TauPOG/TauIDSFs/python/")
+from TauIDSFTool import TauIDSFTool
+from TauIDSFTool import TauESTool
 import ScaleFactor as SF
 
 class Reducible(Group):
