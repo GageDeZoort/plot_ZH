@@ -10,3 +10,4 @@ tau_ID_SF: true
 redo_fit: false
 shift_ES: 'None'
 mass_reco: 'FastMTT'
+data_dir: "/eos/uscms/store/user/jdezoort"

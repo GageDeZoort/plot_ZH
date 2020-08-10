@@ -1,3 +1,4 @@
+import sys
 import uproot
 import numpy as np
 import yaml
@@ -5,17 +6,18 @@ from tqdm import tqdm
 import ROOT
 import boost_histogram as bh
 
-from fitter import Fitter
-from sample import Sample
-from group  import Group
-from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
-from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
+from .fitter import Fitter
+from .sample import Sample
+from .group  import Group
+sys.path.append("../../TauPOG/TauIDSFs/python/")
+from TauIDSFTool import TauIDSFTool
+from TauIDSFTool import TauESTool
 import ScaleFactor as SF
 import fakeFactor2
 
 class Data(Group):
-    def __init__(self, categories, tau_SF, antiEle_SF, antiMu_SF, year):
-        Group.__init__(self, categories, tau_SF, antiEle_SF, antiMu_SF)
+    def __init__(self, categories, antiJet_SF, antiEle_SF, antiMu_SF, year, fitter=None):
+        Group.__init__(self, categories, antiJet_SF, antiEle_SF, antiMu_SF, fitter=None)
         self.year = year
         self.h_group = []
 
@@ -64,4 +66,6 @@ class Data(Group):
                     self.tau_cut(sample, tight1, tight2, fill_value=4.5)
 
             self.fill_cutflow(5.5, sample)
+            self.H_LT_cut(LT_cut, sample, fill_value=6.5)
+            #self.mtt_fit_cut(sample, fill_value=7.5)
             self.fill_hists(sample, blind=True)

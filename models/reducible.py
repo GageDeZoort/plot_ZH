@@ -1,19 +1,21 @@
+import sys
 import uproot
 import numpy as np
 from tqdm import tqdm
 import ROOT
 import boost_histogram as bh
 
-from fitter import Fitter
-from sample import Sample
-from group  import Group
-from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
-from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
+from .fitter import Fitter
+from .sample import Sample
+from .group  import Group
+sys.path.append("../../TauPOG/TauIDSFs/python/")
+from TauIDSFTool import TauIDSFTool
+from TauIDSFTool import TauESTool
 import ScaleFactor as SF
 
 class Reducible(Group):
-    def __init__(self, categories, tau_SF, antiEle_SF, antiMu_SF):
-        Group.__init__(self, categories, tau_SF, antiEle_SF, antiMu_SF)
+    def __init__(self, categories, antiJet_SF, antiEle_SF, antiMu_SF, fitter=None):
+        Group.__init__(self, categories, antiJet_SF, antiEle_SF, antiMu_SF, fitter)
 
     def reweight_nJets(self, lumi):
         for i in range(1, 5):
@@ -51,13 +53,18 @@ class Reducible(Group):
                 self.data_driven_cut(sample, fill_value=5.5)
                 match_3 = sample.events.array('gen_match_3')
                 match_4 = sample.events.array('gen_match_4')
-                sample.mask[match_4 != 5] = False
+                
+                # tau_4: must be real tau
+                sample.mask[((sample.tt == 'et') | (sample.tt == 'mt'))
+                            & match_4 != 5] = False
+                # tau_3,4: must be real taus
                 sample.mask[(sample.tt == 'tt') & (match_3 != 5) & (match_4 != 5)] = False
 
                 if tau_ID_SF: self.add_SFs(sample)
 
-            self.H_LT_cut(LT_cut, sample, fill_value=6.6)
-            if (redo_fit): self.fitter.fit(sample)
+            self.H_LT_cut(LT_cut, sample, fill_value=6.5)
+            self.fitter.fit(sample)
+            self.mtt_fit_cut(sample, fill_value=7.5)
             self.fill_hists(sample)
 
     def reweight_nJet_events(self, sample, LHE_nJets):

@@ -1,3 +1,4 @@
+import sys
 import uproot
 import numpy as np
 import yaml
@@ -5,39 +6,61 @@ from tqdm import tqdm
 import ROOT
 import boost_histogram as bh
 
-from fitter import Fitter
-from sample import Sample
-from TauPOG.TauIDSFs.TauIDSFTool import TauIDSFTool
-from TauPOG.TauIDSFs.TauIDSFTool import TauESTool
+from .fitter import Fitter
+from .sample import Sample
+
+sys.path.append("../../TauPOG/TauIDSFs/python/")
+from TauIDSFTool import TauIDSFTool
+from TauIDSFTool import TauESTool
 import ScaleFactor as SF
 import fakeFactor2
 
 class Group(object):
-    def __init__(self, categories, tau_SF, antiEle_SF, antiMu_SF):
+    def __init__(self, categories, antiJet_SF, antiEle_SF, antiMu_SF, fitter=None):
         self.categories = categories
-        self.tau_SF = tau_SF
+        self.antiJet_SF = antiJet_SF
         self.antiEle_SF = antiEle_SF
         self.antiMu_SF = antiMu_SF
         self.samples = {}
-        self.fitter = None 
+        self.fitter = fitter
         
-        self.mtt_hists = {cat:bh.Histogram(bh.axis.Regular(10, 0, 200)) 
-                          for cat in categories.values()}
+        # mtt: fitted di-tau mass
+        self.mtt_fit_hists  = {cat:bh.Histogram(bh.axis.Regular(10, 0, 200)) 
+                               for cat in categories.values()}
+        # m4l: (raw di-lepton + raw di-tau) mass
+        self.m4l_hists  = {cat:bh.Histogram(bh.axis.Regular(50, 0, 500))
+                           for cat in categories.values()}
+        # mA: (raw di-lepton + fitted di-tau) mass
+        self.mA_hists   = {cat:bh.Histogram(bh.axis.Regular(50, 0, 500))
+                           for cat in categories.values()}
+        # mA_c: (raw di-lepton + fitted di-tau w/ constraint) mass
+        self.mA_c_hists = {cat:bh.Histogram(bh.axis.Regular(50, 0, 500))
+                           for cat in categories.values()}
+        
         self.LT_hists  = {cat:bh.Histogram(bh.axis.Regular(10, 0, 200))
-                          for cat in categories.values()}
-        self.pt1_hists = {cat:bh.Histogram(bh.axis.Regular(10, 0, 200))
                           for cat in categories.values()}
         self.ESratio_hists = {cat:bh.Histogram(bh.axis.Regular(200, 0.9, 1.1))
                               for cat in categories.values()}
         self.cutflow_hists = {cat:bh.Histogram(bh.axis.Regular(20,  0.0, 20.0))
                               for cat in categories.values()}
+                
+        self.hists = {"mtt_fit" : self.mtt_fit_hists, "m4l" : self.m4l_hists,
+                      "mA" : self.mA_hists, "mA_c" : self.mA_c_hists,
+                      "LT" : self.LT_hists, "ESratio" : self.ESratio_hists, 
+                      "cutflow" : self.cutflow_hists}
+        self.hists_from_ntuple = []
 
-    def get_hists(self, cat):
-        return [self.mtt_hists[cat], self.LT_hists[cat], self.pt1_hists[cat],
-                self.ESratio_hists[cat], self.cutflow_hists[cat]]
-        
+    def get_hists(self, cat=None):
+        if cat: return {name:hist[cat] for name, hist in self.hists.items()}
+        else: return self.hists
+
+    def add_hist(self, var, nbins, low, high, from_ntuple=True):
+        new_hists = {cat:bh.Histogram(bh.axis.Regular(nbins, low, high))
+                     for cat in self.categories.values()}
+        self.hists[var] = new_hists
+        if (from_ntuple): self.hists_from_ntuple.append(var)
+       
     def add_sample(self, sample):
-        sample.get_events()
         if (sample.n_entries == 0):
             print("WARNING: {0} has {1} entries"
                   .format(sample.name, sample.n_entries))
@@ -133,11 +156,19 @@ class Group(object):
         return tight1, tight2
 
     def data_driven_cut(self, sample, fill_value):
+        
+        # match arrays contain <e,mu,tau>_genPartFlav variables
         match_3 = sample.events.array('gen_match_3')
-        match_4= sample.events.array('gen_match_4')
+        match_4 = sample.events.array('gen_match_4')
+
+        # cut if electron/muon from prompt tau
         em_cut = (sample.tt == 'em') & ((match_4 == 15) | (match_3 == 15))
+        
+        # cut if (electron/muon from prompt tau) | (unmatched/jet-faked tau) 
         et_mt_cut = ((sample.tt == 'et') | (sample.tt == 'mt')) & ((match_3 == 15) | (match_4 > 5))
         sample.mask[et_mt_cut | em_cut] = False
+
+        # cut if either tau unmatched/jet-faked
         sample.mask[(sample.tt == 'tt') & ((match_3 > 5) | (match_4 > 5))] = False
         self.fill_cutflow(fill_value, sample)
         
@@ -147,45 +178,76 @@ class Group(object):
         match_3 = sample.events.array('gen_match_3')
         match_4 = sample.events.array('gen_match_4')
 
-        for i in range(sample.n_entries):
+        for i in np.arange(sample.n_entries)[sample.mask]:
             if (sample.tt[i] == 'et' or sample.tt[i] == 'mt'):
+
+                # tau_4: prompt electron or tau decay electron
                 if (match_4[i] == 1 or match_4[i] == 3):
                     sample.weights[i] *= self.antiEle_SF.getSFvsEta(eta_4[i], match_4[i])
+                # tau_4: prompt muon or tau decay muon
                 if (match_4[i] == 2 or match_4[i] == 4):
                     sample.weights[i] *= self.antiMu_SF.getSFvsEta(eta_4[i], match_4[i])
+            
             elif (sample.tt[i] == 'tt'):
-                sample.weights[i] *= self.tau_SF.getSFvsPT(pt_3[i], match_3[i]) 
-                sample.weights[i] *= self.tau_SF.getSFvsPT(pt_4[i], match_4[i])
+                sample.weights[i] *= self.antiJet_SF.getSFvsPT(pt_3[i], match_3[i]) 
+                sample.weights[i] *= self.antiJet_SF.getSFvsPT(pt_4[i], match_4[i])
+               
+                # tau_3: prompt electron or tau decay electron
                 if (match_3[i] == 1 or match_3[i] == 3):
                     sample.weights[i] *= self.antiEle_SF.getSFvsEta(eta_3[i], match_3[i])
+                # tau_3: prompt muon or tau decay muon
                 if (match_3[i] == 2 or match_3[i] == 4):
                     sample.weights[i] *= self.antiMu_SF.getSFvsEta(eta_3[i], match_3[i])
+                # tau_4: prompt electron or tau decay electron
                 if (match_4[i] == 1 or match_4[i] == 3):
                     sample.weights[i] *= self.antiEle_SF.getSFvsEta(eta_4[i], match_4[i])
+                # tau_4: prompt muon or tau decay muon
                 if (match_4[i] == 2 or match_4[i] == 4):
                     sample.weights[i] *= self.antiMu_SF.getSFvsEta(eta_4[i], match_4[i])
             
     def H_LT_cut(self, LT_cut, sample, fill_value):
         pt_3, pt_4 = sample.events.array('pt_4'), sample.events.array('pt_3')
-        sample.mask[(pt_3 + pt_4) < LT_cut] = False
+        to_cut = ((pt_3 + pt_4) < LT_cut) & (sample.tt == 'tt')
+        sample.mask[to_cut] = False
+        self.fill_cutflow(fill_value, sample)
+        
+    def mtt_fit_cut(self, sample, fill_value):
+        mtt_low = (sample.mtt_fit < 90)
+        mtt_high = (sample.mtt_fit > 180)
+        out_of_range = (mtt_low) | (mtt_high)
+        for i in range(100):
+            print(sample.mtt_fit[i], mtt_low[i], mtt_high[i], out_of_range[i])
+        
+        sample.mask[out_of_range] = False
         self.fill_cutflow(fill_value, sample)
 
     def fill_hists(self, sample, blind=False):
         for cat in self.categories.values():
-            m_sv = sample.events.array('m_sv')
             good_evts = (sample.cats == cat) & sample.mask
-            if (blind): 
-                good_evts = good_evts & ((m_sv < 80.) | (m_sv > 140.))
-
             weights = sample.weights[good_evts]
-            self.mtt_hists[cat].fill(sample.m_fit[good_evts], weight=weights)
-            self.ESratio_hists[cat].fill(sample.m_fit[good_evts]/m_sv[good_evts])
+
+            mtt_fit_old = sample.events.array('m_sv')
+            if (blind): good_evts = good_evts & ((mtt_fit_old < 80.) | 
+                                                 (mtt_fit_old > 140.))
+
+            # fit the diTau mass spectrum
+            self.mtt_fit_hists[cat].fill(sample.mtt_fit[good_evts], weight=weights)
+            self.ESratio_hists[cat].fill(sample.mtt_fit[good_evts] /
+                                         mtt_fit_old[good_evts])
+            self.m4l_hists[cat].fill(sample.m4l[good_evts], weight=weights)
+            self.mA_hists[cat].fill(sample.mA[good_evts], weight=weights)
+            self.mA_c_hists[cat].fill(sample.mA_c[good_evts], weight=weights)
             
             LT = sample.events.array('pt_3') + sample.events.array('pt_4')
-            self.LT_hists[cat].fill(LT[good_evts], weight=weights)
+            self.LT_hists[cat].fill(LT[good_evts], weight=weights)            
             
-            self.pt1_hists[cat].fill(sample.events.array('pt_1')[good_evts], 
-                                     weight=weights)
+            # fill extra_hists
+            for name, hist in self.hists.items():
+                if (name not in self.hists_from_ntuple): continue
+                try: hist[cat].fill(sample.events.array(name)[good_evts],
+                                    weight=weights)
+                except KeyError: 
+                    print("Cannot access {0} in sample.events".format(name))
             
     def process_samples(self, tight_cuts, sign, data_driven, tau_ID_SF, redo_fit, LT_cut):
         progress_bar= tqdm(self.samples.items())
@@ -209,6 +271,7 @@ class Group(object):
                 self.data_driven_cut(sample, fill_value=5.5)
                 if tau_ID_SF: self.add_SFs(sample)
 
-            self.H_LT_cut(LT_cut, sample, fill_value=6.6)
-            if (redo_fit): self.fitter.fit(sample)
-            self.fill_hists(sample)
+            self.H_LT_cut(LT_cut, sample, fill_value=6.5)
+            self.fitter.fit(sample)
+            self.mtt_fit_cut(sample, fill_value=7.5)
+            self.fill_hists(sample, blind=False)
