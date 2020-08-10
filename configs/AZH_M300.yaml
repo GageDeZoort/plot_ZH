@@ -1,0 +1,21 @@
+verbose: 1
+year: 2018
+LT_cut: 60
+sign: 'OS'
+analysis: 'AZH'
+mass: 300
+data_driven: false
+loose_cuts: false
+unblind: false
+tau_ID_SF: true
+redo_fit: true
+shift_ES: 'None'
+data_dir: "/eos/uscms/store/user/jdezoort"
+fitter: "SVfit"
+
+var_hists:
+  mll: [20, 50, 130, "[GeV]", "$M_{ll}$"]
+  pt_1: [20, 0,  200, "[GeV]", "$p_T^1$" ]
+  pt_2: [20, 0,  200, "[GeV]", "$p_T^2$" ]
+  pt_3: [20, 0,  200, "[GeV]", "$p_T^3$" ]
+  pt_4: [20, 0,  200, "[GeV]", "$p_T^4$" ]
